@@ -18,7 +18,7 @@ namespace NonStandard.Inputs {
             inputActionAsset.FindActionMap("Player").Enable();
             initialized = true;
         }
-        public Binding GetBinding(string name) { return inputBindings.Find(b => b.name == name); }
+        public Binding GetBinding(string name) { return inputBindings.Find(b => b.actionName == name); }
         public void AddBinding(Binding b, bool enable = true) {
             if (inputBindings == null) { inputBindings = new List<Binding>(); }
             inputBindings.Add(b);
@@ -56,17 +56,17 @@ namespace NonStandard.Inputs {
 
     [Serializable]
     public class Binding {
-        public string name;
-        public ControlType type;
-        public string[] controls = null;
+        public string actionName;
+        public ControlType controlType;
+        public string[] bindingPaths = null;
         public EventBind evnt;
-        public UnityInputActionEvent startPerformCancel = new UnityInputActionEvent();
+        public UnityInputActionEvent actionEventHandler = new UnityInputActionEvent();
         internal const char separator = '/';
 
         [Serializable] public class UnityInputActionEvent : UnityEvent<InputAction.CallbackContext> { }
         public Binding(string n, ControlType t, EventBind e, string[] c = null) {
-            name = n; type = t; evnt = e; controls = c;
-            e.Bind(startPerformCancel);
+            actionName = n; controlType = t; evnt = e; bindingPaths = c;
+            e.Bind(actionEventHandler);
         }
         /// <summary>
         /// DEPRECATED. was used before PlayerInput was discovered to be buggy when dynamically allocated.
@@ -76,13 +76,13 @@ namespace NonStandard.Inputs {
         public bool BindAction(PlayerInput playerInput) {
             if (playerInput.actions != null) {
                 //Debug.Log("!!!!! player assign " + name + " " + playerInput.actionEvents.Count);
-                string n = Binding.separator + name;
+                string n = Binding.separator + actionName;
                 foreach (var e in playerInput.actionEvents) {
                     //Debug.Log("~~~~ " + e.actionName + " vs " + name);
                     if (e.actionName.Contains(n)) {
-                        Debug.Log(name + " binding {" + evnt + "()} to " + e);
+                        Debug.Log(actionName + " binding {" + evnt + "()} to " + e);
                         //evnt.Bind(e);
-                        e.AddListener(startPerformCancel.Invoke);
+                        e.AddListener(actionEventHandler.Invoke);
                         return true;
                     }
                 }
@@ -90,10 +90,10 @@ namespace NonStandard.Inputs {
             return false;
         }
         public void Bind(InputActionAsset inputActionAsset, bool enable) {
-            InputAction ia = FindAction(inputActionAsset, name, type, controls);
+            InputAction ia = FindAction(inputActionAsset, actionName, controlType, bindingPaths);
             if (ia == null) {
                 string allActions = string.Join(", ", string.Join(", ", Binding.GetAllActionNames(inputActionAsset)));
-                Debug.LogWarning($"Missing {name} {type}). Did you mean one of these: [{allActions}]");
+                Debug.LogWarning($"Missing {actionName} {controlType}). Did you mean one of these: [{allActions}]");
                 return;
             }
             if (enable) {
@@ -103,21 +103,21 @@ namespace NonStandard.Inputs {
             }
         }
         public void BindAction(InputAction ia) {
-            if (startPerformCancel != null) {
-                ia.started -= startPerformCancel.Invoke;
-                ia.performed -= startPerformCancel.Invoke;
-                ia.canceled -= startPerformCancel.Invoke;
+            if (actionEventHandler != null) {
+                ia.started -= actionEventHandler.Invoke;
+                ia.performed -= actionEventHandler.Invoke;
+                ia.canceled -= actionEventHandler.Invoke;
 
-                ia.started += startPerformCancel.Invoke;
-                ia.performed += startPerformCancel.Invoke;
-                ia.canceled += startPerformCancel.Invoke;
+                ia.started += actionEventHandler.Invoke;
+                ia.performed += actionEventHandler.Invoke;
+                ia.canceled += actionEventHandler.Invoke;
             }
         }
         public void UnbindAction(InputAction ia) {
-            if (startPerformCancel != null) {
-                ia.started -= startPerformCancel.Invoke;
-                ia.performed -= startPerformCancel.Invoke;
-                ia.canceled -= startPerformCancel.Invoke;
+            if (actionEventHandler != null) {
+                ia.started -= actionEventHandler.Invoke;
+                ia.performed -= actionEventHandler.Invoke;
+                ia.canceled -= actionEventHandler.Invoke;
             }
         }
 
@@ -219,7 +219,15 @@ namespace NonStandard.Inputs {
                 isComposite = true, action = action.name
             };
             MethodInfo dynMethod = typeof(InputActionSetupExtensions).GetMethod("AddBindingInternal", BindingFlags.NonPublic | BindingFlags.Static);
-            object result = dynMethod.Invoke(null, new object[] { actionMap, binding });
+            object result = null;
+            try {
+                // v1.0.2 uses 2 parameters
+                result = dynMethod.Invoke(null, new object[] { actionMap, binding });
+            } catch (Exception) { }
+            if (result == null) {
+                // v1.2.0 uses 3 parameters, the third one being ignored if it's -1
+                result = dynMethod.Invoke(null, new object[] { actionMap, binding, -1 });
+            }
             int bindingIndex = (int)result;
             InputActionSetupExtensions.CompositeSyntax compSyntax =
                 (InputActionSetupExtensions.CompositeSyntax)typeof(InputActionSetupExtensions.CompositeSyntax).GetConstructor(
