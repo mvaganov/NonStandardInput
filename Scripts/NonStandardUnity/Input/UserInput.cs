@@ -25,6 +25,9 @@ namespace NonStandard.Inputs {
             b.Bind(inputActionAsset, enable);
         }
         public void Bind(IList<Binding> inputs, bool enable) {
+            if (inputActionAsset == null) {
+                inputActionAsset = ScriptableObject.CreateInstance<InputActionAsset>();
+            }
             for (int i = 0; i < inputs.Count; ++i) {
                 inputs[i].Bind(inputActionAsset, enable);
             }
@@ -38,18 +41,6 @@ namespace NonStandard.Inputs {
             Bind(inputBindings, false);
         }
         public IList<string> GetAllActionNames() { return Binding.GetAllActionNames(inputActionAsset); }
-
-        public static InputActionAsset CreateAsset(string name = "FPS Character Controller", string path = "") {
-#if UNITY_EDITOR
-            string filename = path + "/" + name + "." + InputActionAsset.Extension;
-            //ProjectWindowUtil.CreateAssetWithContent(filename, "{}");
-            //InputActionAsset asset = Resources.Load(filename, typeof(InputActionAsset)) as InputActionAsset;
-            InputActionAsset asset = ScriptableObjectUtility.CreateAsset(typeof(InputActionAsset), filename, "{}") as InputActionAsset;
-            return asset;
-#else
-            return null;
-#endif
-        }
     }
 
     public enum ControlType { Button, Vector2, Vector3, Analog, Axis, Bone, Digital, Double, Dpad, Eyes, Integer, Quaternion, Stick, Touch }
