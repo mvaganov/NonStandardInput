@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using System.Reflection;
+using System.Text;
 
 namespace NonStandard.Inputs {
     public class UserInput : MonoBehaviour {
@@ -43,20 +44,82 @@ namespace NonStandard.Inputs {
             Bind(inputBindings, false);
         }
         public IList<string> GetAllActionNames() { return Binding.GetAllActionNames(inputActionAsset); }
+
+        public static string GetInputDescription() {
+            StringBuilder sb = new StringBuilder();
+            List<InputAction> allEnabledActions = InputSystem.ListEnabledActions();
+            Dictionary<InputActionMap, List<InputAction>> allEnabledActionsByMap = new Dictionary<InputActionMap, List<InputAction>>();
+            List<InputAction> unmapped = null;
+            for (int i = 0; i < allEnabledActions.Count; ++i) {
+                InputAction ia = allEnabledActions[i];
+                if (ia == null) {
+                    if (unmapped == null) { unmapped = new List<InputAction>(); }
+                    unmapped.Add(ia);
+                    continue;
+                }
+                if(!allEnabledActionsByMap.TryGetValue(ia.actionMap, out List<InputAction> enabledActions)){
+                    enabledActions = new List<InputAction>();
+                    allEnabledActionsByMap[ia.actionMap] = enabledActions;
+                }
+                enabledActions.Add(ia);
+            }
+            foreach (var kvp in allEnabledActionsByMap) {
+                sb.Append(kvp.Key.name).Append("\n");
+                foreach(var action in kvp.Value) {
+                    if (action == null) continue;
+                    List<string> inputBindings = new List<string>();
+                    for (int i = 0; i < action.bindings.Count; ++i) {
+                        string bPath = action.bindings[i].path;
+                        if (bPath.StartsWith("<Keyboard>") || bPath.StartsWith("<Mouse>")) {
+                            inputBindings.Add(bPath);
+                        }
+                    }
+                    if (inputBindings.Count == 0) continue;
+                    Binding.Active.TryGetValue(action, out Binding binding);
+                    string desc = binding != null ? " -- " + binding.description : "";
+                    sb.Append("  ").Append(action.name).Append(" ").Append(desc).Append("\n    ");
+                    sb.Append(string.Join("\n    ", inputBindings)).Append("\n");
+                }
+            }
+            if (unmapped != null && unmapped.Count > 0) {
+                sb.AppendLine("---").Append("\n");
+                foreach (var action in unmapped) {
+                    Binding binding = Binding.Active[action];
+                    sb.Append("  ").Append(action.name).Append(" ").Append(binding.description).
+                        Append("\n    ").Append(string.Join("\n    ", binding.bindingPaths)).Append("\n");
+                }
+            }
+            return sb.ToString();
+        }
     }
 
     public enum ControlType { Button, Vector2, Vector3, Analog, Axis, Bone, Digital, Double, Dpad, Eyes, Integer, Quaternion, Stick, Touch }
 
     [Serializable]
     public class Binding {
+        public static Dictionary<InputAction, Binding> Active = new Dictionary<InputAction, Binding>();
+        public static Action OnActiveChange;
+
         public string description, actionName;
         public ControlType controlType;
         public string[] bindingPaths = null;
         public EventBind evnt;
         public UnityInputActionEvent actionEventHandler = new UnityInputActionEvent();
         internal const char separator = '/';
-
         [Serializable] public class UnityInputActionEvent : UnityEvent<InputAction.CallbackContext> { }
+
+        public string ActionMapName {
+            get {
+                int index = actionName.IndexOf(separator);
+                return index >= 0 ? actionName.Substring(0, index) : actionName;
+            }
+        }
+        public string ActionInputName {
+            get {
+                int index = actionName.IndexOf(separator);
+                return index >= 0 ? actionName.Substring(index+1) : actionName;
+            }
+        }
         public Binding(string d, string an, ControlType t, EventBind e, string[] c = null) {
             description = d; actionName = an; controlType = t; evnt = e; bindingPaths = c;
             e.Bind(actionEventHandler);
@@ -97,13 +160,13 @@ namespace NonStandard.Inputs {
         }
         public void BindAction(InputAction ia) {
             if (actionEventHandler != null) {
-                ia.started -= actionEventHandler.Invoke;
-                ia.performed -= actionEventHandler.Invoke;
-                ia.canceled -= actionEventHandler.Invoke;
+                UnbindAction(ia);
 
                 ia.started += actionEventHandler.Invoke;
                 ia.performed += actionEventHandler.Invoke;
                 ia.canceled += actionEventHandler.Invoke;
+                Active[ia] = this;
+                OnActiveChange?.Invoke();
             }
         }
         public void UnbindAction(InputAction ia) {
@@ -111,6 +174,8 @@ namespace NonStandard.Inputs {
                 ia.started -= actionEventHandler.Invoke;
                 ia.performed -= actionEventHandler.Invoke;
                 ia.canceled -= actionEventHandler.Invoke;
+                Active.Remove(ia);
+                OnActiveChange?.Invoke();
             }
         }
 
