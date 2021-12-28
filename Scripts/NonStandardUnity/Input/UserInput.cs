@@ -13,9 +13,11 @@ namespace NonStandard.Inputs {
         [SerializeField] private List<Binding> inputBindings;
         bool initialized = false;
 
+        public string[] actionMapToBindOnStart = new string[0];
+
         void Start() {
             Bind(inputBindings, true);
-            inputActionAsset.FindActionMap("Player").Enable();
+            Array.ForEach(actionMapToBindOnStart, actionMapName => inputActionAsset.FindActionMap(actionMapName).Enable());
             initialized = true;
         }
         public Binding GetBinding(string name) { return inputBindings.Find(b => b.actionName == name); }
@@ -47,7 +49,7 @@ namespace NonStandard.Inputs {
 
     [Serializable]
     public class Binding {
-        public string actionName;
+        public string description, actionName;
         public ControlType controlType;
         public string[] bindingPaths = null;
         public EventBind evnt;
@@ -55,8 +57,8 @@ namespace NonStandard.Inputs {
         internal const char separator = '/';
 
         [Serializable] public class UnityInputActionEvent : UnityEvent<InputAction.CallbackContext> { }
-        public Binding(string n, ControlType t, EventBind e, string[] c = null) {
-            actionName = n; controlType = t; evnt = e; bindingPaths = c;
+        public Binding(string d, string an, ControlType t, EventBind e, string[] c = null) {
+            description = d; actionName = an; controlType = t; evnt = e; bindingPaths = c;
             e.Bind(actionEventHandler);
         }
         /// <summary>
