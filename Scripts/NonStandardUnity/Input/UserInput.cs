@@ -5,6 +5,7 @@ using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using System.Reflection;
 using System.Text;
+using UnityEngine.InputSystem.Layouts;
 
 namespace NonStandard.Inputs {
     public class UserInput : MonoBehaviour {
@@ -47,8 +48,10 @@ namespace NonStandard.Inputs {
 
         public static string GetInputDescription() {
             StringBuilder sb = new StringBuilder();
+            // find all of the enabled actions, and group them by their ActionMap
             List<InputAction> allEnabledActions = InputSystem.ListEnabledActions();
             Dictionary<InputActionMap, List<InputAction>> allEnabledActionsByMap = new Dictionary<InputActionMap, List<InputAction>>();
+            List<InputActionMap> mapOrder = new List<InputActionMap>();
             List<InputAction> unmapped = null;
             for (int i = 0; i < allEnabledActions.Count; ++i) {
                 InputAction ia = allEnabledActions[i];
@@ -63,9 +66,20 @@ namespace NonStandard.Inputs {
                 }
                 enabledActions.Add(ia);
             }
+            // put the input maps in a good order
             foreach (var kvp in allEnabledActionsByMap) {
-                sb.Append(kvp.Key.name).Append("\n");
-                foreach(var action in kvp.Value) {
+                InputActionMap m = kvp.Key;
+                if (m.name == "Player") {
+                    mapOrder.Insert(0, m);
+                } else {
+                    mapOrder.Add(m);
+                }
+            }
+            // generate the text based on each InputAction in each ActionMap. show Binding.description if available.
+            foreach (InputActionMap m in mapOrder) {
+                sb.Append(m.name).Append("\n");
+                List<InputAction> actions = allEnabledActionsByMap[m];
+                foreach (var action in actions) {
                     if (action == null) continue;
                     List<string> inputBindings = new List<string>();
                     for (int i = 0; i < action.bindings.Count; ++i) {
@@ -81,6 +95,7 @@ namespace NonStandard.Inputs {
                     sb.Append(string.Join("\n    ", inputBindings)).Append("\n");
                 }
             }
+            // if there were any input actions that were not part of an action map, show those too.
             if (unmapped != null && unmapped.Count > 0) {
                 sb.AppendLine("---").Append("\n");
                 foreach (var action in unmapped) {
@@ -102,7 +117,7 @@ namespace NonStandard.Inputs {
 
         public string description, actionName;
         public ControlType controlType;
-        public string[] bindingPaths = null;
+        [InputControl] public string[] bindingPaths = null;
         public EventBind evnt;
         public UnityInputActionEvent actionEventHandler = new UnityInputActionEvent();
         internal const char separator = '/';
