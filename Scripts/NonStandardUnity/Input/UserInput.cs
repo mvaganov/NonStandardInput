@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 using System.Reflection;
 using System.Text;
 using UnityEngine.InputSystem.Layouts;
+using UnityEngine.EventSystems;
 
 namespace NonStandard.Inputs {
     public class UserInput : MonoBehaviour {
@@ -106,6 +107,16 @@ namespace NonStandard.Inputs {
             }
             return sb.ToString();
         }
+        public static bool IsMouseOverUIObject() {
+            return IsPointerOverUIObject(Mouse.current.position.ReadValue());
+        }
+        public static bool IsPointerOverUIObject(Vector2 pointerPositon) {
+            PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
+            eventDataCurrentPosition.position = pointerPositon;
+            List<RaycastResult> results = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
+            return results.Count > 0;
+        }
     }
 
     public enum ControlType { Button, Vector2, Vector3, Analog, Axis, Bone, Digital, Double, Dpad, Eyes, Integer, Quaternion, Stick, Touch }
@@ -138,27 +149,6 @@ namespace NonStandard.Inputs {
         public Binding(string d, string an, ControlType t, EventBind e, string[] c = null) {
             description = d; actionName = an; controlType = t; evnt = e; bindingPaths = c;
             e.Bind(actionEventHandler);
-        }
-        /// <summary>
-        /// DEPRECATED. was used before PlayerInput was discovered to be buggy when dynamically allocated.
-        /// </summary>
-        /// <param name="playerInput"></param>
-        /// <returns></returns>
-        public bool BindAction(PlayerInput playerInput) {
-            if (playerInput.actions != null) {
-                //Debug.Log("!!!!! player assign " + name + " " + playerInput.actionEvents.Count);
-                string n = Binding.separator + actionName;
-                foreach (var e in playerInput.actionEvents) {
-                    //Debug.Log("~~~~ " + e.actionName + " vs " + name);
-                    if (e.actionName.Contains(n)) {
-                        Debug.Log(actionName + " binding {" + evnt + "()} to " + e);
-                        //evnt.Bind(e);
-                        e.AddListener(actionEventHandler.Invoke);
-                        return true;
-                    }
-                }
-            }
-            return false;
         }
         public void Bind(InputActionAsset inputActionAsset, bool enable) {
             InputAction ia = FindAction(inputActionAsset, actionName, controlType, bindingPaths);
@@ -228,8 +218,18 @@ namespace NonStandard.Inputs {
             InputAction inputAct = null;
             foreach (InputAction ia in actionMap.actions) { if (ia.name == actionName) { inputAct = ia; } }
             if (inputAct == null) {
+                bool isEnabled = actionMap.enabled;
+                if (isEnabled) {
+                    Debug.Log(actionMap.name+" was enabled, disabling");
+                    actionMap.Disable();
+                }
                 inputAct = actionMap.AddAction(actionName);
+                Debug.Log("added " + actionName);
                 inputAct.expectedControlType = controlType;
+                if (isEnabled) {
+                    Debug.Log("reenabling "+actionMap.name);
+                    actionMap.Enable();
+                }
             }
             if (bindPaths.Length == 0) {
                 //Debug.Log("no actual input for "+ name);

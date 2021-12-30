@@ -3,14 +3,12 @@ using UnityEngine.Events;
 
 public class Cooldown : MonoBehaviour {
     public float cooldown = 3;
-    public float timer = 0;
-    public MonoBehaviour behavior;
+    private float timer = 0;
+    public bool startCooldownOnStart = true;
     public UnityEvent_float onProgressChange;
     public UnityEvent OnStartCooldown, OnEndCooldown;
-    public bool startCooldownOnStart = true;
     [System.Serializable] public class UnityEvent_float : UnityEvent<float> { }
     public void StartCooldown() {
-        Debug.Log("Cooldown!");
         timer = 0;
         OnStartCooldown.Invoke();
     }
