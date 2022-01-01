@@ -1,24 +1,97 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.Layouts;
 using UnityEngine.InputSystem.OnScreen;
 
 namespace NonStandard.Inputs {
-	public class OnScreenStickAnimated : OnScreenStick {
-		RectTransform rt;
-		public float stickAnimationSpeed = 1024;
-		Vector2 targetPosition;
-		private void Start() {
-			rt = GetComponent<RectTransform>();
-		}
-		public void SetStickPositionFrominput(Vector2 input) {
-			targetPosition = input * movementRange;
-		}
-		private void Update() {
-			Vector2 d = targetPosition - rt.anchoredPosition;
-			if (d.SqrMagnitude() > 1) {
-				rt.anchoredPosition += d.normalized * stickAnimationSpeed * Time.deltaTime;
-			} else {
-				rt.anchoredPosition = targetPosition;
-			}
+    public class OnScreenStickAnimated : OnScreenControl, IPointerDownHandler, IPointerUpHandler, IDragHandler {
+        public void OnPointerDown(PointerEventData eventData) {
+            if (eventData == null)
+                throw new System.ArgumentNullException(nameof(eventData));
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(transform.parent.GetComponentInParent<RectTransform>(), eventData.position, eventData.pressEventCamera, out m_PointerDownPos);
+            held = true;
+        }
+
+        public void OnDrag(PointerEventData eventData) {
+            if (eventData == null)
+                throw new System.ArgumentNullException(nameof(eventData));
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(transform.parent.GetComponentInParent<RectTransform>(), eventData.position, eventData.pressEventCamera, out var position);
+            var delta = position - m_PointerDownPos;
+
+            delta = Vector2.ClampMagnitude(delta, movementRange);
+            ((RectTransform)transform).anchoredPosition = m_StartPos + (Vector3)delta;
+
+            inputPosition = new Vector2(delta.x / movementRange, delta.y / movementRange);
+            SendValueToControl(inputPosition);
+            held = true;
+        }
+
+        public void OnPointerUp(PointerEventData eventData) {
+            ((RectTransform)transform).anchoredPosition = m_StartPos;
+            SendValueToControl(Vector2.zero);
+            held = false;
+        }
+
+        public float movementRange {
+            get => m_MovementRange;
+            set => m_MovementRange = value;
+        }
+
+        [SerializeField]
+        private float m_MovementRange = 50;
+
+        [InputControl(layout = "Vector2")]
+        [SerializeField]
+        private string m_ControlPath;
+
+        private Vector3 m_StartPos;
+        private Vector2 m_PointerDownPos;
+
+        protected override string controlPathInternal {
+            get => m_ControlPath;
+            set => m_ControlPath = value;
+        }
+
+        RectTransform rt;
+        public float stickAnimationSpeed = 1024;
+        Vector2 targetPosition;
+        Vector2 inputPosition;
+        public AxisLock axisLock;
+        //public bool forceAutoCenter;
+        bool held = false;
+        public bool executeOnHeld = false;
+        public float holdMultiplier = 1;
+        public enum AxisLock { None, XAxis, YAxis }
+
+        public bool Held => held;
+        private void Start() {
+            m_StartPos = ((RectTransform)transform).anchoredPosition;
+            rt = GetComponent<RectTransform>();
+        }
+        public void SetStickPositionFrominput(Vector2 input) {
+            switch (axisLock) {
+                case AxisLock.XAxis: input.x = 0; break;
+                case AxisLock.YAxis: input.y = 0; break;
+            }
+            targetPosition = input * movementRange;
+        }
+        private void Update() {
+            if (held) return;
+            Vector2 d = targetPosition - rt.anchoredPosition;
+            float distance = d.magnitude;
+            if (distance > stickAnimationSpeed * Time.deltaTime) {
+                Vector2 normalized = d / distance;
+                rt.anchoredPosition += normalized * stickAnimationSpeed * Time.deltaTime;
+            } else {
+                rt.anchoredPosition = targetPosition;
+            }
+        }
+		private void FixedUpdate() {
+			if (executeOnHeld && held) {
+                SendValueToControl(inputPosition * holdMultiplier);
+            }
 		}
 	}
 }
