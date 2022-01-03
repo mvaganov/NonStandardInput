@@ -112,10 +112,10 @@ namespace NonStandard.Inputs {
                     actionMap.Disable();
                 }
                 inputAct = actionMap.AddAction(actionName);
-                Debug.Log("added " + actionName);
+                //Debug.Log("added " + actionName);
                 inputAct.expectedControlType = controlType;
                 if (isEnabled) {
-                    Debug.Log("reenabling " + actionMap.name);
+                    //Debug.Log("reenabling " + actionMap.name);
                     actionMap.Enable();
                 }
             }
