@@ -21,10 +21,16 @@ namespace NonStandard.Inputs {
 			initialized = true;
 		}
 		public InputControlBinding GetBinding(string name) { return inputControlBindings.Find(b => b.actionName == name); }
-		public void AddBinding(InputControlBinding b, bool enable = true) {
+		public void AddBindingIfMissing(InputControlBinding binding, bool enabled = true) {
+			if (inputControlBindings != null && inputControlBindings.Find(b => b.description == binding.description) != null) {
+				return;
+			}
+			AddBinding(binding, enabled);
+		}
+		public void AddBinding(InputControlBinding b, bool enabled = true) {
 			if (inputControlBindings == null) { inputControlBindings = new List<InputControlBinding>(); }
 			inputControlBindings.Add(b);
-			b.Bind(inputActionAsset, enable);
+			b.Bind(inputActionAsset, enabled);
 		}
 		public void Bind(IList<InputControlBinding> inputs, bool enable) {
 			if (inputActionAsset == null) {
