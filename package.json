@@ -1,12 +1,12 @@
 {
   "name": "com.codegiraffe.nonstandard.input",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "displayName": "NonStandard Input",
   "description": "Input System related code",
   "unity": "2019.4",
   "dependencies": {
     "com.unity.inputsystem": "1.0.2",
-	"com.codegiraffe.nonstandard.eventbind": "1.0.0"
+	"com.codegiraffe.nonstandard.unityutility": "0.0.1"
   },
   "keywords": [
     "library",
