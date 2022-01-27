@@ -17,7 +17,6 @@ namespace NonStandard.Inputs {
 		public string description, actionName;
 		public ControlType controlType;
 		[InputControl] public string[] bindingPaths = null;
-		public EventBind evnt;
 		public UnityInputActionEvent actionEventHandler = new UnityInputActionEvent();
 		internal const char separator = '/';
 		[Serializable] public class UnityInputActionEvent : UnityEvent<InputAction.CallbackContext> { }
@@ -34,9 +33,15 @@ namespace NonStandard.Inputs {
 				return index >= 0 ? actionName.Substring(index + 1) : actionName;
 			}
 		}
-		public InputControlBinding(string d, string an, ControlType t, EventBind e, string[] c = null) {
-			description = d; actionName = an; controlType = t; evnt = e; bindingPaths = c;
+		public InputControlBinding(string description, string actionName, ControlType t, EventBind e, string c = null) 
+			: this(description, actionName, t, e, new string[] { c }) {}
+		public InputControlBinding(string description, string actionName, ControlType t, EventBind e, string[] c = null) {
+			this.description = description; this.actionName = actionName; controlType = t; bindingPaths = c;
 			e.Bind(actionEventHandler);
+		}
+		public InputControlBinding(string description, string actionName, ControlType t, EventBind[] events, string[] c = null) {
+			this.description = description; this.actionName = actionName; controlType = t; bindingPaths = c;
+			Array.ForEach(events, e=>e.Bind(actionEventHandler));
 		}
 		public void Bind(InputActionAsset inputActionAsset, bool enable) {
 			InputAction ia = FindAction(inputActionAsset, actionName, controlType, bindingPaths);
@@ -54,7 +59,6 @@ namespace NonStandard.Inputs {
 		public void BindAction(InputAction ia) {
 			if (actionEventHandler != null) {
 				UnbindAction(ia);
-
 				ia.started += actionEventHandler.Invoke;
 				ia.performed += actionEventHandler.Invoke;
 				ia.canceled += actionEventHandler.Invoke;

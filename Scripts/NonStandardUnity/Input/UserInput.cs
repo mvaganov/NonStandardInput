@@ -40,6 +40,14 @@ namespace NonStandard.Inputs {
 				inputs[i].Bind(inputActionAsset, enable);
 			}
 		}
+		public void DisableBinding(string actionName) {
+			InputControlBinding b = GetBinding(actionName);
+			if (b != null) { b.Bind(inputActionAsset, false); }
+		}
+		public void EnableBinding(string actionName) {
+			InputControlBinding b = GetBinding(actionName);
+			if (b != null) { b.Bind(inputActionAsset, true); }
+		}
 		private void OnEnable() {
 			if (!initialized) return;
 			Bind(inputControlBindings, true);
