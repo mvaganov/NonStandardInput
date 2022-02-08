@@ -13,11 +13,16 @@ namespace NonStandard.Inputs {
 		[SerializeField] private List<InputControlBinding> inputControlBindings;
 		bool initialized = false;
 
-		public string[] actionMapToBindOnStart = new string[0];
+		public List<string> actionMapToBindOnStart = new List<string>();
+
+		public void AddActionMapToBind(string mapName) {
+			if (actionMapToBindOnStart.IndexOf(mapName) != -1) { return; }
+			actionMapToBindOnStart.Add(mapName);
+		}
 
 		void Start() {
 			Bind(inputControlBindings, true);
-			Array.ForEach(actionMapToBindOnStart, actionMapName => inputActionAsset.FindActionMap(actionMapName).Enable());
+			actionMapToBindOnStart.ForEach(actionMapName => inputActionAsset.FindActionMap(actionMapName).Enable());
 			initialized = true;
 		}
 		public InputControlBinding GetBinding(string name) { return inputControlBindings.Find(b => b.actionName == name); }
@@ -37,6 +42,7 @@ namespace NonStandard.Inputs {
 				inputActionAsset = ScriptableObject.CreateInstance<InputActionAsset>();
 			}
 			for (int i = 0; i < inputs.Count; ++i) {
+				//Debug.Log("binding "+inputs[i].actionName);
 				inputs[i].Bind(inputActionAsset, enable);
 			}
 		}

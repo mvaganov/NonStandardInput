@@ -84,7 +84,8 @@ namespace NonStandard.Inputs {
 					string actionName = actionMap.name + separator + action.name;
 					if (action.name == expectedActionName || actionName == expectedActionName || actionName.Contains(n)) {
 						if (action.expectedControlType != controlType) {
-							Debug.LogWarning("found " + expectedActionName + ", but Input type is " + action.expectedControlType + ", not " + actionInputType);
+							Debug.LogWarning("found " + expectedActionName + " in " + actionAsset.name + ", but Input type is " + 
+								action.expectedControlType + ", not " + actionInputType + ".");
 						} else {
 							return action;
 						}
@@ -95,6 +96,16 @@ namespace NonStandard.Inputs {
 				return CreateInputActionBinding(actionAsset, expectedActionName, controlType, bindingPathToCreateWithIfMissing);
 			}
 			return null;
+		}
+		public static List<InputAction> GetActiveActions(InputActionMap actionMap) {
+			List<InputAction> activeActions = null;
+			foreach (var ia in actionMap.actions) {
+				if (ia.enabled) {
+					if (activeActions == null) { activeActions = new List<InputAction>(); }
+					activeActions.Add(ia);
+				}
+			}
+			return activeActions;
 		}
 		private static InputAction CreateInputActionBinding(InputActionAsset asset, string name, string controlType, string[] bindPaths) {
 			//Debug.Log("MAKE IT");
@@ -111,16 +122,25 @@ namespace NonStandard.Inputs {
 			foreach (InputAction ia in actionMap.actions) { if (ia.name == actionName) { inputAct = ia; } }
 			if (inputAct == null) {
 				bool isEnabled = actionMap.enabled;
-				if (isEnabled) {
+				List<InputAction> activeActions = GetActiveActions(actionMap);
+				if (isEnabled || activeActions != null) {
 					Debug.Log(actionMap.name + " was enabled, disabling");
 					actionMap.Disable();
 				}
+				asset.Disable();
 				inputAct = actionMap.AddAction(actionName);
+				asset.Enable();
 				//Debug.Log("added " + actionName);
 				inputAct.expectedControlType = controlType;
 				if (isEnabled) {
-					//Debug.Log("reenabling " + actionMap.name);
-					actionMap.Enable();
+					if (activeActions == null) {
+						//Debug.Log("reenabling " + actionMap.name);
+						actionMap.Enable();
+					} else {
+						for(int i = 0; i < activeActions.Count; ++i) {
+							activeActions[i].Enable();
+						}
+					}
 				}
 			}
 			if (bindPaths.Length == 0) {
