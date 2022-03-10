@@ -22,9 +22,24 @@ namespace NonStandard.Inputs {
 
 		void Start() {
 			Bind(inputControlBindings, true);
-			actionMapToBindOnStart.ForEach(actionMapName => inputActionAsset.FindActionMap(actionMapName).Enable());
+			actionMapToBindOnStart.ForEach(EnableActionMap);
 			initialized = true;
 		}
+
+		/// <summary>
+		/// enables actions in the given action map. eg: "CmdLine" enables "CmdLine/UpArrow" and "CmdLine/DownArrow"
+		/// </summary>
+		public void EnableActionMap(string actionMapName) {
+			inputActionAsset.FindActionMap(actionMapName)?.Enable();
+		}
+
+		/// <summary>
+		/// disables actions in the given action map. eg: "CmdLine" disables "CmdLine/UpArrow" and "CmdLine/DownArrow"
+		/// </summary>
+		public void DisableActionMap(string actionMapName) {
+			inputActionAsset.FindActionMap(actionMapName)?.Disable();
+		}
+
 		public InputControlBinding GetBinding(string name) { return inputControlBindings.Find(b => b.actionName == name); }
 		public void AddBindingIfMissing(InputControlBinding binding, bool enabled = true) {
 			if (inputControlBindings != null && inputControlBindings.Find(b => b.description == binding.description) != null) {
