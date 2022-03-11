@@ -29,20 +29,23 @@ namespace Nonstandard.Inputs {
 		/// fast map for inserting characters based on key pressed
 		/// </summary>
 		private Dictionary<KeyControl, KMap> _normalKeyMap = new Dictionary<KeyControl, KMap>();
+		[SerializeField] protected KeyMapNames keyMapName = new KeyMapNames();
 		[Tooltip("each of these will be added as a key bind for " + nameof(KeyInput))]
-		public KMap[] _implicitKeymap;
-		[SerializeField] protected string _keyMapNameNormal = "keyboard";
-		[SerializeField] protected string _keyMapNameShift = "shift";
-		[SerializeField] protected string _keyMapNameCtrl = "ctrl";
-		[SerializeField] protected string _keyMapNameAlt = "alt";
+		[SerializeField] protected KMap[] _implicitKeymap;
 
 		public bool KeyAvailable => _keysDown.Count > 0;
 
+		[Serializable] public class KeyMapNames {
+			public string normal = "keyboard";
+			public string shift = "shift";
+			public string ctrl = "ctrl";
+			public string alt = "alt";
+		}
+		
 		/// <summary>
 		/// data structure used to map characters that result from a key press
 		/// </summary>
-		[System.Serializable]
-		public struct KMap {
+		[System.Serializable] public struct KMap {
 			[InputControl] public string key;
 			public char press;
 			public char shift;
@@ -80,13 +83,13 @@ namespace Nonstandard.Inputs {
 		public static bool IsControlDown() { return s_ctrlIsDown; }
 		public static bool IsAltDown() { return s_altIsDown; }
 		public void ModifierAltHandler(InputAction.CallbackContext ctx) {
-			SpecialModifierHandler(ctx, _keyMapNameCtrl, ref s_ctrlIsDown);
+			SpecialModifierHandler(ctx, keyMapName.ctrl, ref s_ctrlIsDown);
 		}
 		public void SpecialAltHandler(InputAction.CallbackContext ctx) {
-			SpecialModifierHandler(ctx, _keyMapNameAlt, ref s_altIsDown);
+			SpecialModifierHandler(ctx, keyMapName.alt, ref s_altIsDown);
 		}
 		public void ModifierShiftHandler(InputAction.CallbackContext ctx) {
-			SpecialModifierHandler(ctx, _keyMapNameShift, ref s_shiftIsDown);
+			SpecialModifierHandler(ctx, keyMapName.shift, ref s_shiftIsDown);
 		}
 
 		private void SpecialModifierHandler(InputAction.CallbackContext ctx, string mapName, ref bool state) {
@@ -111,20 +114,20 @@ namespace Nonstandard.Inputs {
 			UserInput uinput = GetComponent<UserInput>();
 			// bind implicit keys
 			string[] keyboardInputs = Array.ConvertAll(_implicitKeymap, kp => kp.key);
-			uinput.AddBindingIfMissing(new InputControlBinding("command line standard key input", _keyMapNameNormal + "/KeyInput",
+			uinput.AddBindingIfMissing(new InputControlBinding("console standard key input", keyMapName.normal + "/KeyInput",
 				ControlType.Button, new EventBind(this, nameof(KeyInput)), keyboardInputs));
 			// bind modified key states
-			uinput.AddBindingIfMissing(new InputControlBinding("command line ctrl", _keyMapNameNormal + "/" + _keyMapNameCtrl,
+			uinput.AddBindingIfMissing(new InputControlBinding("console ctrl", keyMapName.normal + "/" + keyMapName.ctrl,
 				ControlType.Button, new EventBind(this, nameof(ModifierAltHandler)), KeyboardInput.Path(
 					new string[] { "ctrl", "leftCtrl", "rightCtrl" })));
-			uinput.AddBindingIfMissing(new InputControlBinding("command line alt", _keyMapNameNormal + "/" + _keyMapNameAlt,
+			uinput.AddBindingIfMissing(new InputControlBinding("console alt", keyMapName.normal + "/" + keyMapName.alt,
 				ControlType.Button, new EventBind(this, nameof(ModifierAltHandler)), KeyboardInput.Path(
 					new string[] { "alt", "leftAlt", "rightAlt" })));
-			uinput.AddBindingIfMissing(new InputControlBinding("command line shift", _keyMapNameNormal + "/" + _keyMapNameShift,
+			uinput.AddBindingIfMissing(new InputControlBinding("console shift", keyMapName.normal + "/" + keyMapName.shift,
 				ControlType.Button, new EventBind(this, nameof(ModifierShiftHandler)), KeyboardInput.Path(
 					new string[] { "shift", "leftShift", "rightShift" })));
 			// make sure the standard 'CmdLine' keys are bound to start with
-			uinput.AddActionMapToBind(_keyMapNameNormal);
+			uinput.AddActionMapToBind(keyMapName.normal);
 		}
 
 		protected virtual void Awake() {
