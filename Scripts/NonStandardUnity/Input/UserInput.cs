@@ -4,40 +4,88 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Text;
 using UnityEngine.EventSystems;
+using UnityEngine.Events;
+using System.Reflection;
 
 namespace NonStandard.Inputs {
 	public class UserInput : MonoBehaviour {
 		[Tooltip("The Character's Controls")]
 		public InputActionAsset inputActionAsset;
-
 		[SerializeField] private List<InputControlBinding> inputControlBindings;
-		bool initialized = false;
-
+		private bool _initialized = false;
 		public List<string> actionMapToBindOnStart = new List<string>();
+		public Callbacks callbacks;
 
-		public void AddActionMapToBind(string mapName) {
+		public bool IsInitialized => _initialized;
+
+		[Serializable] public class UnityEvent_string : UnityEvent<string> { }
+		[Serializable] public class Callbacks {
+			public bool enable = true;
+			public UnityEvent_string OnInputChange;
+		}
+
+		public void AddDefaultActionMapToBind(string mapName) {
 			if (actionMapToBindOnStart.IndexOf(mapName) != -1) { return; }
 			actionMapToBindOnStart.Add(mapName);
 		}
 
+		public bool RemoveDefaultActionMapToBind(string mapName) {
+			if (_initialized) { throw new Exception("removing default action map after Start does nothing"); }
+			int index = actionMapToBindOnStart.IndexOf(mapName);
+			if (index < 0) { return false; }
+			actionMapToBindOnStart.RemoveAt(index);
+			return true;
+		}
+
 		void Start() {
 			Bind(inputControlBindings, true);
+			_initialized = true;
 			actionMapToBindOnStart.ForEach(EnableActionMap);
-			initialized = true;
+		}
+
+		public void EnableActionMap(string actionMapName, bool enable) {
+			if (enable) {
+				EnableActionMap(actionMapName);
+				return;
+			}
+			DisableActionMap(actionMapName);
 		}
 
 		/// <summary>
 		/// enables actions in the given action map. eg: "CmdLine" enables "CmdLine/UpArrow" and "CmdLine/DownArrow"
 		/// </summary>
 		public void EnableActionMap(string actionMapName) {
-			inputActionAsset.FindActionMap(actionMapName)?.Enable();
+			Debug.Log("enabling action map: "+actionMapName);
+			if (IsInitialized) {
+				InputActionMap iam = inputActionAsset.FindActionMap(actionMapName);
+				if (iam != null) {
+					if (!iam.enabled) {
+						iam.Enable();
+					} else {
+						Debug.LogWarning(actionMapName+" already enabled.");
+					}
+				}
+				if (callbacks.enable && callbacks.OnInputChange.GetPersistentEventCount() > 0) {
+					callbacks.OnInputChange.Invoke(GetInputDescription());
+				}
+				return;
+			}
+			AddDefaultActionMapToBind(actionMapName);
 		}
 
 		/// <summary>
 		/// disables actions in the given action map. eg: "CmdLine" disables "CmdLine/UpArrow" and "CmdLine/DownArrow"
 		/// </summary>
 		public void DisableActionMap(string actionMapName) {
-			inputActionAsset.FindActionMap(actionMapName)?.Disable();
+			Debug.Log("disabling action map: " + actionMapName);
+			if (IsInitialized) {
+				inputActionAsset.FindActionMap(actionMapName)?.Disable();
+				if (callbacks.enable && callbacks.OnInputChange.GetPersistentEventCount() > 0) {
+					callbacks.OnInputChange.Invoke(GetInputDescription());
+				}
+				return;
+			}
+			RemoveDefaultActionMapToBind(actionMapName);
 		}
 
 		public InputControlBinding GetBinding(string name) { return inputControlBindings.Find(b => b.actionName == name); }
@@ -70,11 +118,11 @@ namespace NonStandard.Inputs {
 			if (b != null) { b.Bind(inputActionAsset, true); }
 		}
 		private void OnEnable() {
-			if (!initialized) return;
+			if (!_initialized) return;
 			Bind(inputControlBindings, true);
 		}
 		private void OnDisable() {
-			if (!initialized) return;
+			if (!_initialized) return;
 			Bind(inputControlBindings, false);
 		}
 		public IList<string> GetAllActionNames() { return InputControlBinding.GetAllActionNames(inputActionAsset); }
@@ -121,11 +169,24 @@ namespace NonStandard.Inputs {
 							inputBindings.Add(bPath);
 						}
 					}
-					if (inputBindings.Count == 0) continue;
 					InputControlBinding.Active.TryGetValue(action, out InputControlBinding binding);
+					List<string> functionPayload = new List<string>();
+					if (binding != null && binding.actionEventHandler != null) {
+						for (int i = 0; i < binding.actionEventHandler.GetPersistentEventCount(); ++i) {
+							UnityEngine.Object target = binding.actionEventHandler.GetPersistentTarget(i);
+							string methodName = binding.actionEventHandler.GetPersistentMethodName(i);
+							functionPayload.Add(target.name + "." + methodName);
+						}
+					}
 					string desc = binding != null ? " -- " + binding.description : "";
-					sb.Append("  ").Append(action.name).Append(" ").Append(desc).Append("\n    ");
-					sb.Append(string.Join("\n    ", inputBindings)).Append("\n");
+					sb.Append("  ").Append(action.name).Append(" ").Append(desc);
+					if (functionPayload.Count > 0) {
+						sb.Append(" // ").Append(string.Join(", ", functionPayload));
+					}
+					sb.Append("\n");
+					if (inputBindings.Count > 0) {
+						sb.Append("    input: ").Append(string.Join(", ", inputBindings)).Append("\n");
+					}
 				}
 			}
 			// if there were any input actions that were not part of an action map, show those too.
@@ -139,6 +200,7 @@ namespace NonStandard.Inputs {
 			}
 			return sb.ToString();
 		}
+
 		public static bool IsMouseOverUIObject() {
 			return IsPointerOverUIObject(Mouse.current.position.ReadValue());
 		}

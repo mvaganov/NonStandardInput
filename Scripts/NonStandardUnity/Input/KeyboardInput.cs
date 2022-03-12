@@ -12,7 +12,6 @@ namespace Nonstandard.Inputs {
 	[RequireComponent(typeof(UserInput))]
 	public class KeyboardInput : MonoBehaviour {
 		public const string KbPrefix = "<Keyboard>/";
-
 		/// <summary>
 		/// used to help the system determine which modifying keys are currently pressed
 		/// </summary>
@@ -33,6 +32,7 @@ namespace Nonstandard.Inputs {
 		[Tooltip("each of these will be added as a key bind for " + nameof(KeyInput))]
 		[SerializeField] protected KMap[] _implicitKeymap;
 
+		public string KeyMapName => keyMapName.normal;
 		public bool KeyAvailable => _keysDown.Count > 0;
 
 		[Serializable] public class KeyMapNames {
@@ -82,10 +82,10 @@ namespace Nonstandard.Inputs {
 		public static bool IsShiftDown() { return s_shiftIsDown; }
 		public static bool IsControlDown() { return s_ctrlIsDown; }
 		public static bool IsAltDown() { return s_altIsDown; }
-		public void ModifierAltHandler(InputAction.CallbackContext ctx) {
+		public void ModifierCtrlHandler(InputAction.CallbackContext ctx) {
 			SpecialModifierHandler(ctx, keyMapName.ctrl, ref s_ctrlIsDown);
 		}
-		public void SpecialAltHandler(InputAction.CallbackContext ctx) {
+		public void ModifierAltHandler(InputAction.CallbackContext ctx) {
 			SpecialModifierHandler(ctx, keyMapName.alt, ref s_altIsDown);
 		}
 		public void ModifierShiftHandler(InputAction.CallbackContext ctx) {
@@ -108,7 +108,7 @@ namespace Nonstandard.Inputs {
 				//Debug.Log(mapName+" " + state + " via " + ctx.control.path + " " + ctx.phase);
 			}
 		}
-
+#if UNITY_EDITOR
 		protected virtual void Reset() {
 			GenerateImplicitKeyMap();
 			UserInput uinput = GetComponent<UserInput>();
@@ -118,7 +118,7 @@ namespace Nonstandard.Inputs {
 				ControlType.Button, new EventBind(this, nameof(KeyInput)), keyboardInputs));
 			// bind modified key states
 			uinput.AddBindingIfMissing(new InputControlBinding("console ctrl", keyMapName.normal + "/" + keyMapName.ctrl,
-				ControlType.Button, new EventBind(this, nameof(ModifierAltHandler)), KeyboardInput.Path(
+				ControlType.Button, new EventBind(this, nameof(ModifierCtrlHandler)), KeyboardInput.Path(
 					new string[] { "ctrl", "leftCtrl", "rightCtrl" })));
 			uinput.AddBindingIfMissing(new InputControlBinding("console alt", keyMapName.normal + "/" + keyMapName.alt,
 				ControlType.Button, new EventBind(this, nameof(ModifierAltHandler)), KeyboardInput.Path(
@@ -127,9 +127,9 @@ namespace Nonstandard.Inputs {
 				ControlType.Button, new EventBind(this, nameof(ModifierShiftHandler)), KeyboardInput.Path(
 					new string[] { "shift", "leftShift", "rightShift" })));
 			// make sure the standard 'CmdLine' keys are bound to start with
-			uinput.AddActionMapToBind(keyMapName.normal);
+			uinput.AddDefaultActionMapToBind(keyMapName.normal);
 		}
-
+#endif
 		protected virtual void Awake() {
 			// populate the fast standard keypress
 			for (int i = 0; i < _implicitKeymap.Length; ++i) {
@@ -138,6 +138,18 @@ namespace Nonstandard.Inputs {
 					_normalKeyMap[kc] = _implicitKeymap[i];
 				}
 			}
+		}
+
+		protected virtual void OnEnable() {
+			EnableKeyMapProcessing(KeyMapName, true);
+		}
+
+		protected virtual void OnDisable() {
+			EnableKeyMapProcessing(KeyMapName, false);
+		}
+
+		public void EnableKeyMapProcessing(string keyMapName, bool enable) {
+			GetComponent<UserInput>().EnableActionMap(keyMapName, enable);
 		}
 
 		public string Flush() {
@@ -157,7 +169,7 @@ namespace Nonstandard.Inputs {
 
 		protected void KeyDown(KeyControl kc) {
 			if (!enabled) {
-				Debug.Log("ignoring " + kc.name + ", ConsoleInput is disabled.");
+				Debug.Log("ignoring " + kc.name + ", ConsoleInput is disabled. this should not be seen because the InputAction should be disabled when ConsoleInput is disabled.");
 				return;
 			}
 			_keysDown[kc] = Environment.TickCount;
