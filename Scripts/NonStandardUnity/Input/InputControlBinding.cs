@@ -1,3 +1,4 @@
+// code by michael vaganov, released to the public domain via the unlicense (https://unlicense.org/)
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -20,7 +21,7 @@ namespace NonStandard.Inputs {
 
 		public string description, actionName;
 		public ControlType controlType;
-		[InputControl] public string[] bindingPaths = null;
+		[InputControl] public IEnumerable<string> bindingPaths = null;
 		public UnityInputActionEvent actionEventHandler = new UnityInputActionEvent();
 		internal const char separator = '/';
 		[Serializable] public class UnityInputActionEvent : UnityEvent<InputAction.CallbackContext> { }
@@ -42,7 +43,7 @@ namespace NonStandard.Inputs {
 		public InputControlBinding(string description, string actionName, ControlType t, EventBind e, string c = null) 
 			: this(description, actionName, t, e, new string[] { c }) {}
 
-		public InputControlBinding(string description, string actionName, ControlType t, EventBind e, string[] c = null) {
+		public InputControlBinding(string description, string actionName, ControlType t, EventBind e, IEnumerable<string> c = null) {
 			this.description = description; this.actionName = actionName; controlType = t; bindingPaths = c;
 			e.Bind(actionEventHandler);
 		}
@@ -87,7 +88,17 @@ namespace NonStandard.Inputs {
 			}
 		}
 
-		public static InputAction FindAction(InputActionAsset actionAsset, string expectedActionName, ControlType actionInputType, string[] bindingPathToCreateWithIfMissing = null) {
+		public EventBind[] GetPersistentEvents() {
+			EventBind[] events = new EventBind[actionEventHandler.GetPersistentEventCount()];
+			for (int i = 0; i < events.Length; i++) {
+				events[i] = new EventBind(actionEventHandler.GetPersistentTarget(i),
+					actionEventHandler.GetPersistentMethodName(i));
+			}
+			return events;
+		}
+
+		public static InputAction FindAction(InputActionAsset actionAsset, string expectedActionName, 
+		ControlType actionInputType, IEnumerable<string> bindingPathToCreateWithIfMissing = null) {
 			string controlType = actionInputType.ToString();
 			foreach (var actionMap in actionAsset.actionMaps) {
 				string n = separator + expectedActionName;
@@ -120,7 +131,8 @@ namespace NonStandard.Inputs {
 			return activeActions;
 		}
 
-		private static InputAction CreateInputActionBinding(InputActionAsset asset, string name, string controlType, string[] bindPaths) {
+		private static InputAction CreateInputActionBinding(InputActionAsset asset, string name, string controlType,
+		IEnumerable<string> bindPaths) {
 			//Debug.Log("MAKE IT");
 			int mapNameLimit = name.IndexOf("/");
 			string actionMapName = name.Substring(0, mapNameLimit);
@@ -156,17 +168,12 @@ namespace NonStandard.Inputs {
 					}
 				}
 			}
-			if (bindPaths.Length == 0) {
-				//Debug.Log("no actual input for "+ name);
-				return inputAct;
-			}
 			PopulateInputActionControlBinding(actionMap, inputAct, bindPaths);
 			return inputAct;
 		}
 
-		private static void PopulateInputActionControlBinding(InputActionMap actionMap, InputAction action, string[] inputPathToCreateWithIfMissing) {
-			for (int inputBindIndex = 0; inputBindIndex < inputPathToCreateWithIfMissing.Length; inputBindIndex++) {
-				string bindingString = inputPathToCreateWithIfMissing[inputBindIndex];
+		private static void PopulateInputActionControlBinding(InputActionMap actionMap, InputAction action, IEnumerable<string> inputPathToCreateWithIfMissing) {
+			foreach (string bindingString in inputPathToCreateWithIfMissing) {
 				if (bindingString.StartsWith(CompositePrefix)) {
 					//Debug.Log("composite logic "+ bindingString);
 					string text = bindingString.Substring(CompositePrefix.Length);
