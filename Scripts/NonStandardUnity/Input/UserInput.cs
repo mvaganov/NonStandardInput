@@ -7,6 +7,7 @@ using System.Text;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using System.Linq;
+using UnityEditor;
 
 namespace NonStandard.Inputs {
 	public class UserInput : MonoBehaviour {
@@ -110,6 +111,9 @@ namespace NonStandard.Inputs {
 			if (InputControlBindings == null) { InputControlBindings = new List<InputControlBinding>(); }
 			InputControlBindings.Add(b);
 			b.Bind(inputActionAsset, enabled);
+#if UNITY_EDITOR
+			EditorUtility.SetDirty(this);
+#endif
 		}
 
 		public void Bind(IList<InputControlBinding> inputs, bool enable) {

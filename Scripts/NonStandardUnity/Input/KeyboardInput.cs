@@ -103,12 +103,17 @@ namespace Nonstandard.Inputs {
 		}
 #endif
 		protected virtual void Awake() {
-			// populate the fast standard keypress
-			for (int i = 0; i < KeyInput.Count; ++i) {
-				InputControl ic = InputSystem.FindControl(KeyInput[i].key);
-				if (ic is KeyControl kc) {
-					_keyInputMap[kc] = KeyInput[i];
-				}
+			RefreshAllKeyMaps();
+		}
+
+		private void RefreshAllKeyMaps() {
+			KeyInput.ForEach(SetKeyMap);
+		}
+
+		private void SetKeyMap(KeyboardInputMap kmap) {
+			InputControl ic = InputSystem.FindControl(kmap.key);
+			if (ic is KeyControl kc) {
+				_keyInputMap[kc] = kmap;
 			}
 		}
 
@@ -122,6 +127,26 @@ namespace Nonstandard.Inputs {
 
 		public void EnableKeyMapProcessing(string keyMapName, bool enable) {
 			GetComponent<UserInput>().EnableActionMap(keyMapName, enable);
+		}
+
+		public KeyboardInputMap GetKeyMapByPress(char lowercase) {
+			KeyboardInputMap result = new KeyboardInputMap();
+			int index = KeyInput.FindIndex(map => map.press == lowercase);
+			if (index >= 0) {
+				result = KeyInput[index];
+			}
+			return result;
+		}
+
+		public void DisableKeyMapByPress(char lowercase) {
+			KeyboardInputMap result = new KeyboardInputMap();
+			int index = KeyInput.FindIndex(map => map.press == lowercase);
+			if (index >= 0) {
+				result = KeyInput[index];
+				result.press = '\0';
+				KeyInput[index] = result;
+				SetKeyMap(result);
+			}
 		}
 
 		public string Flush() {
@@ -176,7 +201,10 @@ namespace Nonstandard.Inputs {
 			KeyDownTime[kc] = Environment.TickCount;
 			bool isShift = IsShiftDown, isCtrl = IsControlDown, isNormal = !isShift && !isCtrl;
 			if ((isShift || isNormal) && _keyInputMap.TryGetValue(kc, out KeyboardInputMap normalKeyboardKey)) {
-				KeyBuffer.Append(isNormal ? normalKeyboardKey.press : normalKeyboardKey.shift);
+				char value = isNormal ? normalKeyboardKey.press : normalKeyboardKey.shift;
+				if (value != '\0') {
+					KeyBuffer.Append(value);
+				}
 			}
 		}
 
