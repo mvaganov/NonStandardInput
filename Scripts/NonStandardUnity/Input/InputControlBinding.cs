@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Layouts;
+using System.Linq;
 
 namespace NonStandard.Inputs {
 	public enum ControlType { Button, Vector2, Vector3, Analog, Axis, Bone, Digital, Double, Dpad, Eyes, Integer, Quaternion, Stick, Touch }
@@ -21,7 +22,7 @@ namespace NonStandard.Inputs {
 
 		public string description, actionName;
 		public ControlType controlType;
-		[InputControl] public IEnumerable<string> bindingPaths = null;
+		[InputControl] public string[] bindingPaths = null;
 		public UnityInputActionEvent actionEventHandler = new UnityInputActionEvent();
 		internal const char separator = '/';
 		[Serializable] public class UnityInputActionEvent : UnityEvent<InputAction.CallbackContext> { }
@@ -44,12 +45,14 @@ namespace NonStandard.Inputs {
 			: this(description, actionName, t, e, new string[] { c }) {}
 
 		public InputControlBinding(string description, string actionName, ControlType t, EventBind e, IEnumerable<string> c = null) {
-			this.description = description; this.actionName = actionName; controlType = t; bindingPaths = c;
+			this.description = description; this.actionName = actionName; controlType = t; 
+			bindingPaths = c != null ? c.ToArray() : null;
 			e.Bind(actionEventHandler);
 		}
 
-		public InputControlBinding(string description, string actionName, ControlType t, EventBind[] events, string[] c = null) {
-			this.description = description; this.actionName = actionName; controlType = t; bindingPaths = c;
+		public InputControlBinding(string description, string actionName, ControlType t, EventBind[] events, IEnumerable<string> c = null) {
+			this.description = description; this.actionName = actionName; controlType = t;
+			bindingPaths = c != null ? c.ToArray() : null;
 			Array.ForEach(events, e=>e.Bind(actionEventHandler));
 		}
 
@@ -57,7 +60,7 @@ namespace NonStandard.Inputs {
 			InputAction ia = FindAction(inputActionAsset, actionName, controlType, bindingPaths);
 			if (ia == null) {
 				string allActions = string.Join(", ", string.Join(", ", InputControlBinding.GetAllActionNames(inputActionAsset)));
-				Debug.LogWarning($"Missing {actionName} {controlType}). Did you mean one of these: [{allActions}]");
+				Debug.LogWarning($"Missing {actionName} ({controlType}). Did you mean one of these: [{allActions}]");
 				return;
 			}
 			if (enable) {
