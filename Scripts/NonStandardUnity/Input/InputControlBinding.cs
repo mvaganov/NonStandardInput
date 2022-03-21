@@ -9,7 +9,7 @@ using UnityEngine.InputSystem.Layouts;
 using System.Linq;
 
 namespace NonStandard.Inputs {
-	public enum ControlType { Button, Vector2, Vector3, Analog, Axis, Bone, Digital, Double, Dpad, Eyes, Integer, Quaternion, Stick, Touch }
+	public enum ControlType { Button, Vector2, Vector3, Analog, Axis, Bone, Digital, Double, Dpad, Eyes, Integer, Quaternion, Stick, Touch, Key }
 
 	[Serializable]
 	public class InputControlBinding {
@@ -103,7 +103,7 @@ namespace NonStandard.Inputs {
 		public static InputAction FindAction(InputActionAsset actionAsset, string expectedActionName, 
 		ControlType actionInputType, IEnumerable<string> bindingPathToCreateWithIfMissing = null) {
 			string controlType = actionInputType.ToString();
-			foreach (var actionMap in actionAsset.actionMaps) {
+			foreach (InputActionMap actionMap in actionAsset.actionMaps) {
 				string n = separator + expectedActionName;
 				foreach (var action in actionMap.actions) {
 					string actionName = actionMap.name + separator + action.name;
@@ -157,6 +157,7 @@ namespace NonStandard.Inputs {
 				}
 				asset.Disable();
 				inputAct = actionMap.AddAction(actionName);
+				//inputAct = actionMap.AddAction(actionName, InputActionType.PassThrough);
 				asset.Enable();
 				//Debug.Log("added " + actionName);
 				inputAct.expectedControlType = controlType;

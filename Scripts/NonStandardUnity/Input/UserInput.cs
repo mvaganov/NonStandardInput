@@ -51,6 +51,7 @@ namespace NonStandard.Inputs {
 				InputActionMap iam = inputActionAsset.FindActionMap(actionMapName);
 				if (iam != null) {
 					if (!iam.enabled) {
+						//Debug.Log("enabling "+ actionMapName);
 						iam.Enable();
 					} else {
 						Debug.LogWarning(actionMapName + " already enabled.");

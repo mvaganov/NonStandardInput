@@ -1,4 +1,5 @@
 // code by michael vaganov, released to the public domain via the unlicense (https://unlicense.org/)
+#define INPUT_SYSTEM_KEY_UP_BROKEN // InputSystem does not reliably give KeyUp events
 using NonStandard;
 using NonStandard.Inputs;
 using System;
@@ -31,12 +32,41 @@ namespace Nonstandard.Inputs {
 		private Dictionary<KeyControl, KeyboardInputMap> _keyInputMap = new Dictionary<KeyControl, KeyboardInputMap>();
 		[SerializeField] protected KeyMapNames keyMapNames = new KeyMapNames();
 		public List<KeyboardInputMap> KeyInput;
+		/// <summary>
+		/// the time of the last update, used to calculate if an automatic key repeat should happen
+		/// </summary>
+		private long _lastFrame = 0;
+		public KeyRepetition KeyRepetitionRules = new KeyRepetition();
+		/// <summary>
+		/// used to ignore the key that triggered the activation of the keyboard input
+		/// </summary>
+		private KeyControl _ignoreNext;
+		/// <summary>
+		/// needed to fix a bug: the InputSystem does not correctly handle key releases, and if a key is released
+		/// while the last performed key is still being pressed, when the last performed key is released it will be
+		/// performed again, and then instantly cancelled. this dictionary watches for and catches that situation, and
+		/// special logic undoes the last press.
+		/// </summary>
+		private Dictionary<KeyControl, double> _recentKeyEvents = new Dictionary<KeyControl, double>();
 
 		public string KeyMapName => keyMapNames.normal;
 		public bool KeyAvailable => KeyDownTime.Count > 0;
 		public static bool IsShiftDown => s_shiftIsDown;
 		public static bool IsControlDown => s_ctrlIsDown;
 		public static bool IsAltDown => s_altIsDown;
+
+		[Serializable] public class KeyRepetition {
+			[Tooltip("Holding a key for more than "+nameof(holdMs)+" will cause it to repeat every "+nameof(delayMs))]
+			public bool enable = true;
+			[Tooltip("How long to hold a key before the first repeat starts happening")]
+			public int holdMs = 1000;
+			[Tooltip("How long to wait between repeats")]
+			public int delayMs = 50;
+#if INPUT_SYSTEM_KEY_UP_BROKEN
+			public KeyControl key;
+			public long pressTime;
+#endif
+		}
 
 		[Serializable] public class KeyMapNames {
 			public string normal = "keyboard";
@@ -125,6 +155,40 @@ namespace Nonstandard.Inputs {
 			EnableKeyMapProcessing(KeyMapName, false);
 		}
 
+		protected virtual void Update() {
+			long now = Environment.TickCount;
+			if (KeyRepetitionRules.enable) {
+				UpdateKeyRepetitionBasedOnKeyHeld(now);
+			}
+			_lastFrame = now;
+		}
+
+		protected void UpdateKeyRepetitionBasedOnKeyHeld(long now) {
+			if (KeyRepetitionRules.key == null) { return; }
+			long pressShouldHaveAtLeastBeenBefore = now - KeyRepetitionRules.holdMs;
+#if INPUT_SYSTEM_KEY_UP_BROKEN
+			if (KeyRepetitionRules.pressTime > pressShouldHaveAtLeastBeenBefore) { return; }
+			long holdDurationLastFrame = _lastFrame - KeyRepetitionRules.pressTime - KeyRepetitionRules.holdMs;
+			long holdDurationNow = now - KeyRepetitionRules.pressTime - KeyRepetitionRules.holdMs;
+			int pressCountNow = (int)(holdDurationNow / KeyRepetitionRules.delayMs);
+			int pressCountThen = (int)(holdDurationLastFrame / KeyRepetitionRules.delayMs);
+			if (pressCountNow != pressCountThen) {
+				DoKeyPress(KeyRepetitionRules.key);
+			}
+#else
+			foreach (KeyValuePair<KeyControl, int> kvp in KeyDownTime) {
+				if (kvp.Value > pressShouldHaveAtLeastBeenBefore) { continue; }
+				long holdDurationLastFrame = _lastFrame - kvp.Value - KeyRepetitionRules.holdMs;
+				long holdDurationNow = now - kvp.Value - KeyRepetitionRules.holdMs;
+				int pressCountNow = (int)(holdDurationNow / KeyRepetitionRules.delayMs);
+				int pressCountThen = (int)(holdDurationLastFrame / KeyRepetitionRules.delayMs);
+				if (pressCountNow != pressCountThen) {
+					DoKeyPress(kvp.Key);
+				}
+			}
+#endif
+		}
+
 		public void EnableKeyMapProcessing(string keyMapName, bool enable) {
 			GetComponent<UserInput>().EnableActionMap(keyMapName, enable);
 		}
@@ -185,10 +249,20 @@ namespace Nonstandard.Inputs {
 		}
 
 		public void KeyInputHandler(InputAction.CallbackContext context) {
+			//Debug.Log(context.phase + " " + context.control + " " + context.startTime);
+			KeyControl kc = context.control as KeyControl;
 			switch (context.phase) {
 				// performed happens for each key, started only happens when the first keypress in a sequence happens
-				case InputActionPhase.Performed: KeyDown(context.control as KeyControl); return;
-				case InputActionPhase.Canceled: KeyUp(context.control as KeyControl); return;
+				case InputActionPhase.Performed:
+					KeyDown(kc);
+					_recentKeyEvents[kc] = context.startTime;
+					return;
+				case InputActionPhase.Canceled:
+					KeyUp(kc);
+					if (_recentKeyEvents.TryGetValue(kc, out double time) && time == context.startTime) {
+						UndoKeyPress(kc);
+					}
+					return;
 			}
 		}
 
@@ -198,7 +272,20 @@ namespace Nonstandard.Inputs {
 					"Should not be seen because InputActions should be disabled when ConsoleInput is disabled.");
 				return;
 			}
+			//if (KeyDownTime.ContainsKey(kc)) {
+			//	Debug.Log("performing already performed key..." + kc);
+			//	return;
+			//}
 			KeyDownTime[kc] = Environment.TickCount;
+#if INPUT_SYSTEM_KEY_UP_BROKEN
+			KeyRepetitionRules.key = kc;
+			KeyRepetitionRules.pressTime = Environment.TickCount;
+#endif
+			DoKeyPress(kc);
+		}
+
+		public void DoKeyPress(KeyControl kc) {
+			if (_ignoreNext == kc) { _ignoreNext = null; return; }
 			bool isShift = IsShiftDown, isCtrl = IsControlDown, isNormal = !isShift && !isCtrl;
 			if ((isShift || isNormal) && _keyInputMap.TryGetValue(kc, out KeyboardInputMap normalKeyboardKey)) {
 				char value = isNormal ? normalKeyboardKey.press : normalKeyboardKey.shift;
@@ -208,9 +295,34 @@ namespace Nonstandard.Inputs {
 			}
 		}
 
+		public void UndoKeyPress(KeyControl kc) {
+			bool isShift = IsShiftDown, isCtrl = IsControlDown, isNormal = !isShift && !isCtrl;
+			if ((isShift || isNormal) && _keyInputMap.TryGetValue(kc, out KeyboardInputMap normalKeyboardKey)) {
+				char value = isNormal ? normalKeyboardKey.press : normalKeyboardKey.shift;
+				if (value != '\0') {
+					string keyBuffer = KeyBuffer.ToString();
+					int index = keyBuffer.LastIndexOf(value);
+					KeyBuffer = new StringBuilder(keyBuffer.Remove(index, 1));
+				}
+			}
+		}
+
 		protected void KeyUp(KeyControl kc) {
 			if (!enabled) { return; }
 			KeyDownTime.Remove(kc);
+#if INPUT_SYSTEM_KEY_UP_BROKEN
+			KeyRepetitionRules.key = null;
+			KeyRepetitionRules.pressTime = Environment.TickCount;
+#endif
+		}
+
+		public void SetEnableFromKey(bool enable, KeyControl keyControl) {
+			if (enable && !enabled && keyControl != null) {
+				if (_keyInputMap.ContainsKey(keyControl)) {
+					_ignoreNext = keyControl;
+				}
+			}
+			enabled = enable;
 		}
 
 		/// <summary>
