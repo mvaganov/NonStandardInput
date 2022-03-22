@@ -145,14 +145,15 @@ namespace NonStandard.Inputs {
 			return InputControlBinding.GetAllActionNames(inputActionAsset);
 		}
 
-		private static string[] defaultOrder = new string[] { "Player" };
-		public static string GetInputDescription() => GetInputDescription(defaultOrder);
-		public static string GetInputDescription(IList<string> preferredOrder) {
+		private static string[] defaultPreferredFirst = new string[] { "Player" };
+		private static string[] defaultPreferredLast = new string[] { "UI" };
+		public static string GetInputDescription() => GetInputDescription(defaultPreferredLast, defaultPreferredLast);
+		public static string GetInputDescription(IList<string> preferredFirst, IList<string> preferredLast) {
 			StringBuilder sb = new StringBuilder();
 			Dictionary<InputActionMap, List<InputAction>> allEnabledActionsByMap = 
 				AllEnabledActionsByMap(out List<InputAction> unmapped);
 			List<InputActionMap> mapOrder = new List<InputActionMap>(allEnabledActionsByMap.Keys);
-			OrderListByPreference(mapOrder, preferredOrder);
+			OrderListByPreference(mapOrder, preferredFirst, preferredLast);
 			foreach (InputActionMap inputActionMap in mapOrder) {
 				AppendInputActionMapInfo(sb, inputActionMap, allEnabledActionsByMap);
 			}
@@ -163,14 +164,25 @@ namespace NonStandard.Inputs {
 			return sb.ToString();
 		}
 
-		private static void OrderListByPreference(List<InputActionMap> mapOrder, IList<string> preferredOrder) {
+		private static void OrderListByPreference(List<InputActionMap> mapOrder, IList<string> preferredFirst, IList<string> preferredLast) {
 			int index = 0;
-			for (int order = 0; order < preferredOrder.Count; order++) {
+			for (int order = 0; order < preferredFirst.Count; order++) {
 				for (int i = 0; i < mapOrder.Count; i++) {
 					InputActionMap m = mapOrder[i];
-					if (m.name == preferredOrder[order]) {
+					if (m.name == preferredFirst[order]) {
 						mapOrder.RemoveAt(i);
 						mapOrder.Insert(index, m);
+						index++;
+						break;
+					}
+				}
+			}
+			for (int order = 0; order < preferredLast.Count; order++) {
+				for (int i = 0; i < mapOrder.Count; i++) {
+					InputActionMap m = mapOrder[i];
+					if (m.name == preferredLast[order]) {
+						mapOrder.RemoveAt(i);
+						mapOrder.Insert(mapOrder.Count - index, m);
 						index++;
 						break;
 					}
