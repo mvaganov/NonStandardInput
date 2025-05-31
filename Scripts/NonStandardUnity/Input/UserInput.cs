@@ -11,8 +11,10 @@ using UnityEditor;
 
 namespace NonStandard.Inputs {
 	public class UserInput : MonoBehaviour {
+#if HAS_INPUTSYSTEM
 		[Tooltip("The Character's Controls")]
 		public InputActionAsset inputActionAsset;
+#endif
 		public List<InputControlBinding> InputControlBindings;
 		private bool _initialized = false;
 		public List<string> ActionMapToBindOnStart = new List<string>();
